@@ -1,5 +1,6 @@
 # mPython 软件
-A python IDE for mPython (ESP32) board, based on mu-editor.
+A python Code Editor for mPython (ESP32) board, based on mu-editor. 
+https://github.com/mu-editor/mu
 
 
 运行环境
