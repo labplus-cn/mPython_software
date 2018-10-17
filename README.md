@@ -1,3 +1,4 @@
+
 # mPython软件
 欢迎您，使用掌控板配套IDE。
 
@@ -36,21 +37,5 @@ python -m pip install --upgrade pip
 
 建议fork到自己的项目在提交
 =======
-# mPython 软件
-A python Code Editor for mPython (ESP32) board, based on mu-editor. 
-https://github.com/mu-editor/mu
+=======
 
-
-运行环境
-Python 3.6.6
-
-
-本地运行步骤
-
-git clone https://github.com/labplus-cn/mPython_software.git
-
-pip install -r requirements.txt
-
-python run.py
-
->>>>>>> 6f5a88ade827f4509ca7b137b185ac68006514ca
