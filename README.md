@@ -1,1 +1,1 @@
-# mPython2_src
+# mPython software
