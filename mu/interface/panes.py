@@ -372,6 +372,7 @@ class EspFileList(MuFileList):
     put = pyqtSignal(str)
     delete = pyqtSignal(str)
     run_py = pyqtSignal(str)
+    run_content = pyqtSignal(str)
     load_py = pyqtSignal(str,str)
     stop_run_py = pyqtSignal()
     write_lib = pyqtSignal()
@@ -406,14 +407,13 @@ class EspFileList(MuFileList):
         self.set_message.emit(msg)
         self.list_files.emit()
 
-    def on_put_run(self, esp_file):
+    def on_run_content(self, content):
         """
-        Fired when the put event is completed for the given filename.
+        Running in ESP32 memory.
         """
-        msg = _("'{}' successfully copied to mPython board, please wait for the list to refresh.").format(esp_file)
+        msg = _("Running in real time ...")
         self.set_message.emit(msg)
-        self.list_files.emit()
-        self.run_py.emit(esp_file)
+        self.run_content.emit(content)
 
     def contextMenuEvent(self, event):
         menu = QMenu(self)

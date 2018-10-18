@@ -86,14 +86,18 @@ class DeviceRunner(QThread):
         QThread.__init__(self)
         self.running = False
         
-    def set(self, filename, serial):
+    def set(self, filename, content, serial):
         self.filename = filename
+        self.content = content
         self.serial = serial
 
     def run(self):
         try:
             self.running = True
-            result, err = espfs.run_py(self, filename=self.filename, serial=self.serial)
+            if self.filename is None:
+                result, err = espfs.run_content(self, content=self.content, serial=self.serial)
+            else:
+                result, err = espfs.run_py(self, filename=self.filename, serial=self.serial)
             if result is False:
                 size = re.findall("\d+", str(err, "utf8"))[0]
                 self.on_error.emit(_("MemoryError: memory allocation failed,"
@@ -151,7 +155,7 @@ class FileManager(QObject):
     on_rename_start = pyqtSignal()
     on_rename = pyqtSignal(str, str)
     on_rename_fail = pyqtSignal(str)
-    on_put_run_file = pyqtSignal(str)
+    on_run_content = pyqtSignal(str)
     
     def __init__(self):
         super(QObject, self).__init__()
@@ -240,9 +244,20 @@ class FileManager(QObject):
         try:
             self.stop_py.emit()
             time.sleep(1)
-            self.device_runner.set(esp_filename, None)
+            self.device_runner.set(esp_filename, None, None)
             self.device_runner.start()
             self.on_run_file.emit(esp_filename)
+        except Exception as ex:
+            logger.error(ex)
+            self.on_run_fail.emit("{}".format(ex))
+
+    def run_content(self, content):
+        try:
+            self.stop_py.emit()
+            time.sleep(1)
+            self.device_runner.set(None, content, None)
+            self.device_runner.start()
+            # self.on_run_file.emit(esp_filename)
         except Exception as ex:
             logger.error(ex)
             self.on_run_fail.emit("{}".format(ex))
@@ -339,7 +354,7 @@ class EspMode(MicroPythonMode):
             {
                 'name': 'run',
                 'display_name': _('Run'),
-                'description': _('Flash & run your code onto the mPython board.'),
+                'description': _('Run your code in real time on the mPython board.'),
                 'handler': self.run_file,
                 'shortcut': 'F5',
             },
@@ -692,50 +707,28 @@ class EspMode(MicroPythonMode):
         tab = self.editor._view.current_tab
         if tab is None:
             return
-        if not tab.path:
-            # Unsaved file.
-            message = _('Please save the file first.')
-            self.view.show_message(message, None)
-            return
-        else:
-            if not tab.path.lower().endswith('.py'):
-                self.editor.show_status_message(_('Only Python file can be run.'))
-                return
         port, number = espfs.find_device()
         if port is None:
             message = _('Could not find an attached mPython board.')
             information = _("Please make sure the mPython board is plugged into this computer.")
             self.view.show_message(message, information)
         else:
-            #self.editor.save()
             content = tab.text()
             if self.fs is None:
                 try:
-                    #espfs.put(tab.path, target=None)
-                    self.editor.show_status_message(_("Flashing to board ..."))
-                    espfs.put_py(tab.path, content, target=None)
                     self.add_fs()
                     if self.file_manager:
-                        self.file_manager.on_put_run_file.emit(os.path.basename(tab.path))
+                        self.file_manager.on_run_content.emit(content)
                 except Exception as ex:
                     logger.error(ex)
-                    if self.file_manager:
-                        self.file_manager.on_put_fail.emit(os.path.basename(tab.path))
             else:
                 try:
                     if self.file_manager:
                         self.file_manager.stop_py.emit()
-                        time.sleep(0.5)
-                    #espfs.put(tab.path, target=None)
-                    self.editor.show_status_message(_("Flashing to board ..."))
-                    espfs.put_py(tab.path, content, target=None)
-                    if self.file_manager:
-                        self.file_manager.on_put_run_file.emit(os.path.basename(tab.path))
-                    # self.fs.list_files.emit()
+                        time.sleep(0.5)                        
+                        self.file_manager.on_run_content.emit(content)
                 except Exception as ex:
                     logger.error(ex)
-                    if self.file_manager:
-                        self.file_manager.on_put_fail.emit(os.path.basename(tab.path))
 
     def copy_main(self):
         """

@@ -18,6 +18,7 @@ import os
 import time
 import os.path
 import logging
+import json
 from serial.tools.list_ports import comports as list_serial_ports
 from serial import Serial
 
@@ -360,6 +361,53 @@ def run_py(parent, filename, serial=None):
         time.sleep(0.01)
     time.sleep(0.1)
     command_bytes = command.encode('utf-8')
+    for i in range(0, len(command_bytes), 64):
+        serial.write(command_bytes[i:min(i + 64, len(command_bytes))])
+        time.sleep(0.01)
+    time.sleep(0.1)
+    serial.setDTR(False)
+    response = serial.read_until(b'\x04>')       # Read until prompt.
+    #print(response)
+    if response.find(b'MemoryError:') > 0:
+        try:
+            out, err = response.split(b'MemoryError:', 1)  # Split stdout, stderr
+            if err:
+                err = err.replace(b'\r\n', b'')
+                err = err.replace(b'>', b'')
+                err = b'MemoryError:' + err
+                return False, err
+        except:
+            return False, b'MemoryError:'
+    #print("thread running")
+    while True:
+        if parent.running:
+            time.sleep(0.1)
+        else:
+            break;
+    #print("thread end")
+    serial.write(b'\x02\x03')
+    time.sleep(0.1)
+    return True, None
+
+
+def run_content(parent, content, serial=None):
+    #print("espfs:run_content")
+    content = content.replace("\r\n", "\n")
+    content = json.dumps(content)
+    command = "exec({},globals())\r\n".format(content)
+    if serial is None:
+        serial = get_serial()
+        time.sleep(0.1)
+    serial.setDTR(True)
+    time.sleep(0.1)
+    # Send a Control-B / exit raw mode.
+    serial.write(b'\x02')
+    for i in range(3):
+        serial.write(b'\r\x03')
+        time.sleep(0.01)
+    time.sleep(0.1)
+    command_bytes = command.encode('utf-8')
+    #print(command_bytes)
     for i in range(0, len(command_bytes), 64):
         serial.write(command_bytes[i:min(i + 64, len(command_bytes))])
         time.sleep(0.01)

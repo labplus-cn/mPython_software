@@ -859,6 +859,9 @@ msgstr "把你的程序下载到掌控板"
 msgid "Flash & run your code onto the mPython board."
 msgstr "把你的程序下载到掌控板，并尝试运行"
 
+msgid "Run your code in real time on the mPython board."
+msgstr "在掌控板上实时运行代码"
+
 msgid "Access the file system on the mPython board."
 msgstr "访问掌控板上的文件系统"
 
@@ -957,6 +960,9 @@ msgstr "没有选中文件。"
 
 msgid "Flashing to board ..."
 msgstr "正在写入掌控板 ..."
+
+msgid "Running in real time ..."
+msgstr "实时运行中 ..."
 
 msgid "Flash basic library (mpython.py)"
 msgstr "写入基础库(mpython.py)"
