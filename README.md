@@ -1,6 +1,6 @@
 
 # mPython软件
-The mPython software is a branch of on the [Mu](https://github.com/mu-editor/mu) . It adds support of mPython board (or other ESP32 core hardware).
+The mPython software is a branch of the [Mu](https://github.com/mu-editor/mu) . It adds support of the mPython board (or others ESP32 core hardware).
 
 mPython软件是开源软件 [Mu](https://github.com/mu-editor/mu) 的一个分支，它增加了对掌控板（或同类ESP32核心硬件）的支持。
 
