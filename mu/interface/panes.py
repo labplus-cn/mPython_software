@@ -136,7 +136,7 @@ class MicroPythonREPLPane(QTextEdit):
         self.set_theme(theme)
         if self.serial:
             self.serial.setDataTerminalReady(False)
-            self.serial.setRequestToSend(False)
+            # self.serial.setRequestToSend(False)
             self.serial.write(b'\x04')
 
     def paste(self):

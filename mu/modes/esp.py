@@ -24,6 +24,7 @@ import logging
 import semver
 import time
 import re
+import platform
 from tokenize import TokenError
 from mu.logic import HOME_DIRECTORY
 from mu.contrib import uflash, espfs
@@ -298,7 +299,10 @@ class FileManager(QObject):
             self.on_write_lib_start.emit()
             app_path = sys.executable if getattr(sys, 'frozen', False) else sys.argv[0]
             app_dir = os.path.dirname(os.path.abspath(app_path))
-            libpath = os.path.join(app_dir, "mpython.py")
+            if platform.system() == "Darwin":
+                libpath = os.path.join(app_dir, "../Resources/mpython.py")
+            else:
+                libpath = os.path.join(app_dir, "mpython.py")
             espfs.write_lib(libpath)
             self.on_write_lib.emit()
         except Exception as ex:
