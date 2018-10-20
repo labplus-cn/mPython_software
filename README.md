@@ -1,8 +1,8 @@
 
 # mPython软件
-The mPython2 software is a branch of on the Mu(https://github.com/mu-editor/mu) . It adds support of mPython board (or other ESP32 core hardware).
+The mPython software is a branch of the [Mu](https://github.com/mu-editor/mu) . It adds support of the mPython board (or others ESP32 core hardware).
 
-mPython2 软件是开源软件 Mu(https://github.com/mu-editor/mu) 的一个分支，它增加了对掌控板（或同类ESP32核心硬件）的支持。
+mPython软件是开源软件 [Mu](https://github.com/mu-editor/mu) 的一个分支，它增加了对掌控板（或同类ESP32核心硬件）的支持。
 
 mPython掌控板是一块MicroPython微控制器板，它集成ESP32高性能双核芯片，使用当下最流行的Python编程语言，以便您轻松地将代码从桌面传输到微控制器或嵌入式系统。
 
@@ -41,7 +41,7 @@ python -m pip install --upgrade pip
 * 撰写mpython案例
 * translate mpython to your native language
 
-建议fork到自己的项目在提交
+建议fork到自己的项目再提交
 =======
 =======
 
