@@ -348,6 +348,9 @@ def stop_py(serial=None):
 
 def run_py(parent, filename, serial=None):
     #print("espfs:run_py")
+    filename = json.dumps(filename)
+    if filename.startswith('"') and filename.endswith('"'):
+        filename = filename[1:-1]
     command = "exec(open('./{}').read(),globals())\r\n".format(filename)
     if serial is None:
         serial = get_serial()
@@ -359,7 +362,7 @@ def run_py(parent, filename, serial=None):
     for i in range(3):
         serial.write(b'\r\x03')
         time.sleep(0.01)
-    time.sleep(0.1)
+    time.sleep(0.5)
     command_bytes = command.encode('utf-8')
     for i in range(0, len(command_bytes), 64):
         serial.write(command_bytes[i:min(i + 64, len(command_bytes))])
@@ -405,7 +408,7 @@ def run_content(parent, content, serial=None):
     for i in range(3):
         serial.write(b'\r\x03')
         time.sleep(0.01)
-    time.sleep(0.1)
+    time.sleep(0.5)
     command_bytes = command.encode('utf-8')
     #print(command_bytes)
     for i in range(0, len(command_bytes), 64):

@@ -913,8 +913,14 @@ msgstr "删除到回收站"
 msgid "Successfully move file: '{}' to your trash."
 msgstr "已将文件 '{}' 转移到回收站。"
 
+msgid "Run selected file"
+msgstr "运行选中文件"
+
 msgid "Run by default"
 msgstr "设为默认运行"
+
+msgid "Stop running"
+msgstr "停止运行"
 
 msgid "Only Python file can be set to run by default."
 msgstr "只有Python源程序可以设置为默认运行程序。"
@@ -999,3 +1005,29 @@ msgstr "当前程序无法实时运行，请尝试设为默认程序运行。（
 
 msgid "\nFound a new version '{}' of the software, download it now ?"
 msgstr "\n发现新版本软件 '{}'，是否下载？"
+
+msgid "Recovery firmware (cannot be undone)"
+msgstr "恢复固件，不可撤销"
+
+msgid "Restoring to the original firmware will lose all "
+"personal files. This operation is irreversible. "
+"Press 'OK' to continue?"
+msgstr "恢复原始固件将丢失所有文件，此操作不可逆，是否继续？"
+
+msgid "Please install Python 3.6 and esptool first, then run this command."
+msgstr "请先安装 Python 3.6 和 esptool 工具，再运行这个指令。"
+
+msgid "In the next 10 seconds, please press the Key A and Key B at once then loose both keys"
+msgstr "准备恢复固件，请同时按下A键 + B键，然后松开，此过程需要在10秒内完成"
+
+msgid "Recovery failed"
+msgstr "恢复固件失败"
+
+msgid "Start to recovery the firmware, it took about 30 seconds to recovery..."
+msgstr "开始恢复固件，恢复完成后会自动刷新列表，此过程约需30秒..."
+
+msgid "Recovery complete"
+msgstr "恢复固件完成"
+
+msgid "Recovering {} %"
+msgstr "恢复进度 {} %"

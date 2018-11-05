@@ -445,6 +445,7 @@ class Window(QMainWindow):
         self.fs_pane.esp_fs.rename.connect(file_manager.rename)
         self.fs_pane.esp_fs.delete.connect(file_manager.delete)
         self.fs_pane.esp_fs.list_files.connect(file_manager.ls)
+        self.fs_pane.esp_fs.reset_firmware.connect(file_manager.reset_firmware)
         self.fs_pane.local_fs.get.connect(file_manager.get)
         self.fs_pane.local_fs.list_files.connect(file_manager.ls)
         file_manager.on_put_file.connect(self.fs_pane.esp_fs.on_put)

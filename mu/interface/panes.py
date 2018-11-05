@@ -25,6 +25,7 @@ import signal
 import string
 import bisect
 import os.path
+import json
 from PyQt5.QtCore import (Qt, QProcess, QProcessEnvironment, pyqtSignal,
                           QTimer, QUrl)
 from collections import deque
@@ -145,7 +146,10 @@ class MicroPythonREPLPane(QTextEdit):
         """
         clipboard = QApplication.clipboard()
         if clipboard and clipboard.text():
-            to_paste = clipboard.text().replace('\n', '\r').\
+            to_paste = json.dumps(clipboard.text())
+            if to_paste.startswith('"') and to_paste.endswith('"'):
+                to_paste = to_paste[1:-1]
+            to_paste = to_paste.replace('\\r', '\r').replace('\\n', '\r').\
                 replace('\r\r', '\r')
             self.serial.write(bytes(to_paste, 'utf8'))
 
@@ -378,6 +382,7 @@ class EspFileList(MuFileList):
     write_lib = pyqtSignal()
     set_default = pyqtSignal(str)
     rename = pyqtSignal(str,str)
+    reset_firmware = pyqtSignal()
 
     def __init__(self, home):
         super().__init__()
@@ -418,11 +423,12 @@ class EspFileList(MuFileList):
     def contextMenuEvent(self, event):
         menu = QMenu(self)
         load_action = menu.addAction(_("Open in Mu"))
-        run_action = menu.addAction(_("Run"))
-        stop_action = menu.addAction(_("Stop"))
+        run_action = menu.addAction(_("Run selected file"))
+        stop_action = menu.addAction(_("Stop running"))
         write_lib_action = menu.addAction(_("Flash basic library (mpython.py)"))
         setdft_action = menu.addAction(_("Run by default"))
         rename_action = menu.addAction(_("Rename"))
+        restore_action = menu.addAction(_("Recovery firmware (cannot be undone)"))
         delete_action = menu.addAction(_("Delete (cannot be undone)"))
         action = menu.exec_(self.mapToGlobal(event.pos()))
         no_file_found = False
@@ -484,8 +490,16 @@ class EspFileList(MuFileList):
             if okPressed and (len(name)!=0) and (esp_filename != name):
                 self.rename.emit(esp_filename, name)
                 #print(name)
-
-            
+        elif action == restore_action:
+            mess = QMessageBox(self)
+            mess.setIcon(QMessageBox.Information)
+            mess.setText(_("Restoring to the original firmware will lose all "
+                           "personal files. This operation is irreversible. "
+                           "Press 'OK' to continue?"))
+            mess.setWindowTitle(_("mPython2"))
+            mess.setStandardButtons(QMessageBox.Ok | QMessageBox.Cancel)
+            if mess.exec_() == QMessageBox.Ok:
+                self.reset_firmware.emit()           
         if no_file_found is True:
             msg = _('No file selected.')
             self.set_message.emit(msg)
@@ -494,8 +508,8 @@ class EspFileList(MuFileList):
         """
         Fired when the delete event is completed for the given filename.
         """
-        msg = _("'{}' successfully deleted from mPython board, please wait for the list to refresh.").\
-            format(esp_file)
+        msg = _("'{}' successfully deleted from mPython board, please wait for"
+                " the list to refresh.").format(esp_file)
         self.set_message.emit(msg)
         self.list_files.emit()
 
@@ -907,7 +921,7 @@ class EspFileSystemPane(QFrame):
                             "technical information. Alternatively, try "
                             "unplugging/plugging-in your mPython board and/or "
                             "restarting Mu."))
-        self.disable()
+        # self.disable()
 
     def on_put_fail(self, filename):
         """

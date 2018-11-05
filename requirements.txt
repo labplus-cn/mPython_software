@@ -27,3 +27,4 @@ sphinx
 twine
 wheel
 send2trash
+esptool

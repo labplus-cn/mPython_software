@@ -25,6 +25,7 @@ import semver
 import time
 import re
 import platform
+import subprocess
 from tokenize import TokenError
 from mu.logic import HOME_DIRECTORY
 from mu.contrib import uflash, espfs
@@ -111,6 +112,92 @@ class DeviceRunner(QThread):
         self.running = False
 
 
+class DeviceRestorer(QThread):
+
+    on_info = pyqtSignal(str)
+    on_restore = pyqtSignal()
+    on_start = pyqtSignal()
+    on_finish = pyqtSignal()
+
+    def __init__(self):
+        QThread.__init__(self)
+        self.running = False
+
+    def set(self, port):
+        self.port = port
+
+    def run(self):
+        try:
+            self.running = True
+            if platform.system() == "Darwin":
+                app_path = sys.executable if getattr(sys, 'frozen', False) else sys.argv[0]
+                app_dir = os.path.dirname(os.path.abspath(app_path))
+                lib_path = os.path.join(app_dir, "../Resources/")
+                cmd = '"{}python/bin/python3" "{}app_packages/esptool.py" -p {} -b 1152000 write_flash -ff=40m -fm=dio -fs=8MB 0x0000 "{}target.bin"'.format(lib_path, lib_path, self.port, lib_path)
+            else:
+                app_dir = os.path.split( os.path.realpath( sys.argv[0] ) )[0]
+                # app_dir = "D:\\github\\mu-mpython\\build\\nsis"
+                cmd = '"{}\\Python\\python.exe" "{}\\pkgs\\esptool.py" -p {} -b 1152000 write_flash -ff=40m -fm=dio -fs=8MB 0x0000 "{}\\target.bin"'.format(app_dir, app_dir, self.port, app_dir)
+
+            # self.on_info.emit(app_dir)
+            
+            p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            while p.poll() is None:
+                line = p.stdout.readline()
+                if line.startswith(b'\'esptool\' '):
+                    self.on_info.emit(_('Please install Python 3.6 and esptool first, then run this command.'))
+                elif line.startswith(b'Serial port COM'):
+                    self.on_info.emit(_('In the next 10 seconds, please press the Key A and Key B at once then loose both keys'))
+                # elif line.startswith(b'A fatal error occurred: Failed to connect to Espressif device:'):
+                # elif line.startswith(b'A fatal error occurred: MD5 of file does not match data in flash!'):
+                elif line.startswith(b'A fatal error occurred: '):
+                    self.on_info.emit(_('Recovery failed'))
+                elif line.startswith(b'Compressed '):
+                    self.on_info.emit(_('Start to recovery the firmware, it took about 30 seconds to recovery...'))
+                    self.on_start.emit()
+                elif line.startswith(b'Hard resetting via RTS pin...'):
+                    self.on_finish.emit()
+                # print(line)
+            # print("run over")
+            self.running = False
+            self.on_restore.emit()
+        except Exception as ex:
+            logger.error(ex)
+
+    def stop(self):
+        self.running = False
+
+
+class DeviceRestoreTimer(QThread):
+
+    on_info = pyqtSignal(str)
+
+    def __init__(self):
+        QThread.__init__(self)
+        self.running = False
+
+    def run(self):
+        time.sleep(1)
+        self.running = True
+        count = 0
+        max = 35
+        while count < max:
+            if self.running:
+                time.sleep(1)
+                self.on_info.emit(_('Recovering {} %').format(str(count * 3)))
+                if count < 33:
+                    count += 1
+            else:
+                time.sleep(1)
+                self.on_info.emit(_('Recovering {} %').format("100"))
+                # time.sleep(1)
+                # self.on_info.emit(_('Recovery complete'))
+                return
+
+    def stop(self):
+        self.running = False
+
+
 class FileManager(QObject):
     """
     Used to manage micro:bit filesystem operations in a manner such that the
@@ -119,7 +206,6 @@ class FileManager(QObject):
     Provides an FTP-ish API. Emits signals on success or failure of different
     operations.
     """
-
     # Emitted when the tuple of files on the mPython is known.
     on_list_files = pyqtSignal(tuple, str)
     # Emitted when the file with referenced filename is got from the mPython.
@@ -161,8 +247,15 @@ class FileManager(QObject):
     def __init__(self):
         super(QObject, self).__init__()
         self.device_runner = DeviceRunner()
+        self.device_restorer = DeviceRestorer()
+        self.restorer_timer = DeviceRestoreTimer()
         self.stop_py.connect(self.device_runner.stop)
         self.device_runner.on_error.connect(self.on_error)
+        self.device_restorer.on_info.connect(self.on_info)
+        self.device_restorer.on_restore.connect(self.on_start)
+        self.device_restorer.on_start.connect(self.on_restore_start)
+        self.device_restorer.on_finish.connect(self.on_restore_finish)
+        self.restorer_timer.on_info.connect(self.on_info)
 
     def on_start(self):
         """
@@ -173,6 +266,15 @@ class FileManager(QObject):
 
     def on_error(self, err):
         self.on_run_fail.emit(err)
+        
+    def on_info(self, err):
+        self.on_run_fail.emit(err)
+
+    def on_restore_start(self):
+        self.restorer_timer.start()
+
+    def on_restore_finish(self):
+        self.restorer_timer.stop()
 
     def ls(self):
         """
@@ -319,6 +421,22 @@ class FileManager(QObject):
         except Exception as ex:
             logger.error(ex)
             self.on_rename_fail.emit("{}".format(ex))
+
+    def reset_firmware(self):
+        try:
+            self.stop_py.emit()
+            time.sleep(0.5)
+            port, serial_number = espfs.find_device()
+            if port is not None:
+                self.device_restorer.set(port)
+                self.device_restorer.start()
+                # p = Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE)  
+                # p.wait()  
+                # if p.returncode != 0:  
+                #    print("Error.")  
+                #    return -1 
+        except Exception as ex:
+            logger.error(ex)
 
 
 class EspMode(MicroPythonMode):
