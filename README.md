@@ -17,11 +17,11 @@ mPython掌控板在线文档: https://mPython.readthedocs.io
 ## 软件下载地址
 目前有三个下载地址（for Windows 64位、Windows 32位、MacOS）：
 
-http://static.steamaker.cn/files/mPython2_0.2.3_win64.exe
+http://static.steamaker.cn/files/mPython2_0.2.4_win64.exe
 
-http://static.steamaker.cn/files/mPython2_0.2.3_win32.exe
+http://static.steamaker.cn/files/mPython2_0.2.4_win32.exe
 
-http://static.steamaker.cn/files/mPython2_0.2.3_macos.zip
+http://static.steamaker.cn/files/mPython2_0.2.4_macos.zip
 
 ## 软件使用教程
 软件使用教程请参考[mpython文档](https://mpython.readthedocs.io/zh/latest/board/software.html)
