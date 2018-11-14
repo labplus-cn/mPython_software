@@ -4,11 +4,17 @@
 
 # mpython buildin periphers drivers
 
+# history:
+# V1.1 add oled draw function,add buzz.freq().  by tangliufeng
+# V1.2 add servo/ui class,by tangliufeng
+
+
 from machine import I2C, PWM, Pin, ADC, TouchPad
 from ssd1106 import SSD1106_I2C
 import esp
 import ustruct
 from neopixel import NeoPixel
+from esp import dht_readinto
 from time import sleep_ms, sleep_us
 
 pins_remap_esp32 = [33, 32, 35, 34, 39, 0, 16, 17, 26, 25, 
@@ -57,13 +63,13 @@ class Accelerometer():
         self.i2c = i2c
         self.i2c.writeto(self.addr, b'\x0F\x08')    # set resolution = 10bit
         self.i2c.writeto(self.addr, b'\x11\x00')    # set power mode = normal
-    
+
     def get_x(self):
         self.i2c.writeto(self.addr, b'\x02', False)
         buf = self.i2c.readfrom(self.addr, 2)
         x = ustruct.unpack('h', buf)[0]
         return x / 4 / 4096
-        
+
     def get_y(self):
         self.i2c.writeto(self.addr, b'\x04', False)
         buf = self.i2c.readfrom(self.addr, 2)
@@ -144,9 +150,193 @@ class OLED(SSD1106_I2C):
                     i = i + 1
             x = x + width + 1
 
+    def circle(self, x0, y0, radius , c):
+            # Circle drawing function.  Will draw a single pixel wide circle with
+            # center at x0, y0 and the specified radius.
+            f = 1 - radius
+            ddF_x = 1
+            ddF_y = -2 * radius
+            x = 0
+            y = radius
+            super().pixel(x0, y0 + radius, c)
+            super().pixel(x0, y0 - radius, c)
+            super().pixel(x0 + radius, y0, c)
+            super().pixel(x0 - radius, y0, c)
+            while x < y:
+                if f >= 0:
+                    y -= 1
+                    ddF_y += 2
+                    f += ddF_y
+                x += 1
+                ddF_x += 2
+                f += ddF_x
+                super().pixel(x0 + x, y0 + y, c)
+                super().pixel(x0 - x, y0 + y, c)
+                super().pixel(x0 + x, y0 - y, c)
+                super().pixel(x0 - x, y0 - y, c)
+                super().pixel(x0 + y, y0 + x, c)
+                super().pixel(x0 - y, y0 + x, c)
+                super().pixel(x0 + y, y0 - x, c)
+                super().pixel(x0 - y, y0 - x, c)
 
-class Buzz(object):
+
+    def fill_circle(self, x0, y0, radius, c):
+        # Filled circle drawing function.  Will draw a filled circule with
+        # center at x0, y0 and the specified radius.
+        super().vline(x0, y0 - radius, 2*radius + 1, c)
+        f = 1 - radius
+        ddF_x = 1
+        ddF_y = -2 * radius
+        x = 0
+        y = radius
+        while x < y:
+            if f >= 0:
+                y -= 1
+                ddF_y += 2
+                f += ddF_y
+            x += 1
+            ddF_x += 2
+            f += ddF_x
+            super().vline(x0 + x, y0 - y, 2*y + 1, c)
+            super().vline(x0 + y, y0 - x, 2*x + 1, c)
+            super().vline(x0 - x, y0 - y, 2*y + 1, c)
+            super().vline(x0 - y, y0 - x, 2*x + 1, c)
+            
+
+    def triangle(self, x0, y0, x1, y1, x2, y2, c):
+            # Triangle drawing function.  Will draw a single pixel wide triangle
+            # around the points (x0, y0), (x1, y1), and (x2, y2).
+            super().line(x0, y0, x1, y1, c)
+            super().line(x1, y1, x2, y2, c)
+            super().line(x2, y2, x0, y0, c)
+
+
+    def fill_triangle(self, x0, y0, x1, y1, x2, y2, c):
+        # Filled triangle drawing function.  Will draw a filled triangle around
+        # the points (x0, y0), (x1, y1), and (x2, y2).
+        if y0 > y1:
+            y0, y1 = y1, y0
+            x0, x1 = x1, x0
+        if y1 > y2:
+            y2, y1 = y1, y2
+            x2, x1 = x1, x2
+        if y0 > y1:
+            y0, y1 = y1, y0
+            x0, x1 = x1, x0
+        a = 0
+        b = 0
+        y = 0
+        last = 0
+        if y0 == y2:
+            a = x0
+            b = x0
+            if x1 < a:
+                a = x1
+            elif x1 > b:
+                b = x1
+            if x2 < a:
+                a = x2
+            elif x2 > b:
+                b = x2
+            super().hline(a, y0, b-a+1, c)
+            return
+        dx01 = x1 - x0
+        dy01 = y1 - y0
+        dx02 = x2 - x0
+        dy02 = y2 - y0
+        dx12 = x2 - x1
+        dy12 = y2 - y1
+        if dy01 == 0:
+            dy01 = 1
+        if dy02 == 0:
+            dy02 = 1
+        if dy12 == 0:
+            dy12 = 1
+        sa = 0
+        sb = 0
+        if y1 == y2:
+            last = y1
+        else:
+            last = y1-1
+        for y in range(y0, last+1):
+            a = x0 + sa // dy01
+            b = x0 + sb // dy02
+            sa += dx01
+            sb += dx02
+            if a > b:
+                a, b = b, a
+            super().hline(a, y, b-a+1, c)
+        sa = dx12 * (y - y1)
+        sb = dx02 * (y - y0)
+        while y <= y2:
+            a = x1 + sa // dy12
+            b = x0 + sb // dy02
+            sa += dx12
+            sb += dx02
+            if a > b:
+                a, b = b, a
+            super().hline(a, y, b-a+1, c)
+            y += 1
+            
+
+    def Bitmap(self, x, y, bitmap, w, h,c):
+        byteWidth = int((w + 7) / 8)
+        for j in range(h):
+            for i in range(w):
+                if bitmap[int(j * byteWidth + i / 8)] & (128 >> (i & 7)):
+                    super().pixel(x+i, y+j, c)
+
+
+    def drawCircleHelper(self, x0, y0, r, cornername, c):
+            f = 1 - r
+            ddF_x = 1
+            ddF_y = -2 * r 
+            x = 0
+            y = r
+            
+            tf = f
+            while x < y:
+            
+                if (f >= 0):
+                    # y--   y -= 1 below
+                    y -= 1
+                    ddF_y += 2
+                    f += ddF_y      
+            #   x++ 
+                ddF_x += 2
+                f += ddF_x
+                
+                if (cornername & 0x4):
+                    super().pixel(x0 + x, y0 + y, c)
+                    super().pixel(x0 + y, y0 + x, c)
+                
+                if (cornername & 0x2):
+                    super().pixel(x0 + x, y0 - y, c)
+                    super().pixel(x0 + y, y0 - x, c)
+            
+                if (cornername & 0x8):
+                    super().pixel(x0 - y, y0 + x, c)
+                    super().pixel(x0 - x, y0 + y, c)
+                
+                if (cornername & 0x1):
+                    super().pixel(x0 - y, y0 - x, c)
+                    super().pixel(x0 - x, y0 - y, c)
+                x += 1
+
     
+    def RoundRect( self, x, y, w, h, r, c):
+        self.hline(x + r , y , w - 2 * r , c)
+        self.hline(x + r , y + h - 1, w - 2 * r , c)
+        self.vline(x, y + r, h - 2 * r , c)
+        self.vline(x + w - 1, y + r , h - 2 * r , c)
+        
+        self.drawCircleHelper(x + r  , y + r , r , 1, c)
+        self.drawCircleHelper(x + w - r - 1, y + r  , r , 2, c)
+        self.drawCircleHelper(x + w - r - 1, y + h - r - 1, r , 4, c)
+        self.drawCircleHelper(x + r  , y + h - r - 1, r , 8, c)
+
+
+class Buzz(object):   
     def __init__(self, pin=6):
         self.id = pins_remap_esp32[pin]
         self.io = Pin(self.id) 
@@ -164,6 +354,9 @@ class Buzz(object):
             self.io.init(self.id, Pin.OUT)
             self.io.value(1)
             self.isOn = False
+
+    def freq(self, freq):
+        self.pwm.freq(freq)
 
 
 class PinMode(object):
@@ -200,22 +393,22 @@ class MPythonPin(Pin):
             self.adc = ADC(Pin(self.id))
             self.adc.atten(ADC.ATTN_11DB)
         self.mode = mode
-        
+
     def read_digital(self):
         if not self.mode == PinMode.IN:
             raise TypeError('the pin is not in IN mode')
         return super().value()
-        
+
     def write_digital(self, value):
         if not self.mode == PinMode.OUT:
             raise TypeError('the pin is not in OUT mode')
         super().value(value)
-        
+
     def read_analog(self):
         if not self.mode == PinMode.ANALOG:
             raise TypeError('the pin is not in ANALOG mode')
         return self.adc.read()
-        
+
     def write_analog(self, duty, freq=1000):
         if not self.mode == PinMode.PWM:
             raise TypeError('the pin is not in PWM mode')        
@@ -236,6 +429,91 @@ class LightSensor(ADC):
         return super().read() * 1.1 / 4095 / 6.81 / 0.011
     
 '''
+
+def numberMap(inputNum,bMin,bMax,cMin,cMax):
+    outputNum = 0
+    outputNum =((cMax - cMin) / (bMax - bMin))*(inputNum - bMin)+cMin
+    return outputNum
+
+class Servo:
+    def __init__(self, pin, min_us=750, max_us=2250, actuation_range=180):
+        self.min_us = min_us
+        self.max_us = max_us
+        self.actuation_range = actuation_range
+        self.servoPin=MPythonPin(pin,PinMode.PWM)
+        
+
+    def write_us(self, us):
+        if us < self.min_us or us > self.max_us:
+            raise ValueError("us out of range")
+        duty = round(us / 20000 * 1023)
+        self.servoPin.write_analog(duty, 50)
+
+    def write_angle(self, angle):
+        if angle < 0 or angle > self.actuation_range:
+            raise ValueError("Angle out of range")
+        us_range = self.max_us - self.min_us
+        us = self.min_us + round(angle * us_range / self.actuation_range)
+        self.write_us(us)
+
+
+class UI():
+
+    def ProgressBar(self, x, y, width, height, progress):
+
+        radius = int(height / 2)
+        xRadius = x + radius
+        yRadius = y + radius
+        doubleRadius = 2 * radius
+        innerRadius = radius - 2
+
+        oled.RoundRect(x,y,width,height,radius,1)
+        maxProgressWidth = int((width - doubleRadius + 1) * progress / 100)
+        oled.fill_circle(xRadius, yRadius, innerRadius,1)
+        oled.fill_rect(xRadius + 1, y + 2, maxProgressWidth, height - 3,1)
+        oled.fill_circle(xRadius + maxProgressWidth, yRadius, innerRadius,1)
+
+    def stripBar(self, x, y, width, height, progress,dir=1,frame=1):
+
+        oled.rect(x,y,width,height,frame)
+        if  dir:
+            Progress=int(progress/100 *width)
+            oled.fill_rect(x,y,Progress,height,1)
+        else:
+            Progress=int(progress/100 *height)
+            oled.fill_rect(x,y+(height-Progress),width,Progress,1)
+
+
+class DHTBase:
+    def __init__(self, pin):
+        self.id = pins_remap_esp32[pin]
+        self.io = Pin(self.id) 
+        self.buf = bytearray(5)
+
+    def measure(self):
+        buf = self.buf
+        dht_readinto(self.io, buf)
+        if (buf[0] + buf[1] + buf[2] + buf[3]) & 0xff != buf[4]:
+            raise Exception("checksum error")
+
+class DHT11(DHTBase):
+    def humidity(self):
+        return self.buf[0]
+
+    def temperature(self):
+        return self.buf[2]
+
+class DHT22(DHTBase):
+    def humidity(self):
+        return (self.buf[0] << 8 | self.buf[1]) * 0.1
+
+    def temperature(self):
+        t = ((self.buf[2] & 0x7f) << 8 | self.buf[3]) * 0.1
+        if self.buf[2] & 0x80:
+            t = -t
+        return t
+
+
 
 # buzz
 buzz = Buzz()

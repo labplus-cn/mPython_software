@@ -1017,8 +1017,8 @@ msgstr "恢复原始固件将丢失所有文件，此操作不可逆，是否继
 msgid "Please install Python 3.6 and esptool first, then run this command."
 msgstr "请先安装 Python 3.6 和 esptool 工具，再运行这个指令。"
 
-msgid "In the next 10 seconds, please press the Key A and Key B at once then loose both keys"
-msgstr "准备恢复固件，请同时按下A键 + B键，然后松开，此过程需要在10秒内完成"
+msgid "In the next 15 seconds, please press the Key A and Key B at once then loose both keys"
+msgstr "准备恢复固件，请同时按下A键 + B键，然后松开，此过程需要在15秒内完成"
 
 msgid "Recovery failed"
 msgstr "恢复固件失败"
@@ -1031,3 +1031,44 @@ msgstr "恢复固件完成"
 
 msgid "Recovering {} %"
 msgstr "恢复进度 {} %"
+
+msgid "\nFound a new version of 'mpython.py' library, update now ?"
+msgstr "\n发现新版本的 'mpython.py' 库，是否更新？"
+
+msgid "The 'mpython.py' library which preseted in software has been updated to the latest version."
+msgstr "软件内置的 'mpython.py' 库已更新到最新版本。"
+
+msgid "\nFound a new firmware of mPython board, update now ?"
+msgstr "\n发现新版本的掌控板固件，是否更新？"
+
+msgid "The firmware of mPython board which preseted in software has been updated to the latest version."
+msgstr "软件内置的 掌控板固件 已更新到最新版本。"
+
+msgid "The firmware (release date: {}) which preloaded in hardware is different"
+" from the firmware (release date: {}) which preseted in software. The question"
+" is whether to replace the firmware in hardware by the firmware in software."
+"\n\nWarning: this operation will cause all user files lost."
+msgstr "掌控板板载固件(发布日期：{}) 与 软件内置固件(发布日期：{})不同，"
+"是否更新板载固件？\n\n注意：此操作将丢失所有用户文件，请谨慎操作。"
+
+msgid "No onboard firmware detected, replace the firmware in hardware by the "
+"firmware in software (release date: {})."
+"\n\nWarning: this operation will cause all user files lost."
+msgstr "未检测到板载固件，是否恢复软件内置固件(发布日期：{}) ？"
+"\n\n注意：此操作将丢失所有用户文件，请谨慎操作。"
+
+msgid "Ignore this update"
+msgstr "忽略本次更新"
+
+msgid "Don\'t prompt me"
+msgstr "以后不再提示"
+
+msgid "WARNING: This operation will cause all user files lost.!!!\n"
+"WARNING: This operation will cause all user files lost !!!\n"
+"WARNING: This operation will cause all user files lost !!!"
+msgstr "警告：此操作将丢失所有用户文件，请谨慎操作！！！\n"
+"警告：此操作将丢失所有用户文件，请谨慎操作！！！\n"
+"警告：此操作将丢失所有用户文件，请谨慎操作！！！"
+
+msgid "The python file '{}' has been copied successfully, press 'OK' to run it?"
+msgstr "Python文件 '{}' 已刷入成功，是否立即运行？"

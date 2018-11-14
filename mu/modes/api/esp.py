@@ -31,7 +31,7 @@ ESP_APIS = [
     _("mpython.buzz.isOn \n蜂鸣器开关状态，返回值为 True/False"),
     _("mpython.buzz.on(n) \n蜂鸣器开，参数n为频率，单位Hz，如：500(Hz)"),
     _("mpython.buzz.off() \n蜂鸣器关"),
-    #_("mpython.buzz.freq(n) \n蜂鸣器频率，单位Hz"),
+    _("mpython.buzz.freq(n) \n蜂鸣器频率，单位Hz"),
     #_("mpython.buzz.duty(n) \n蜂鸣器音量，0～512"),
     # mpython TextMode
     _("mpython.TextMode.normal \n值为1"),
@@ -43,16 +43,38 @@ ESP_APIS = [
     _("mpython.PinMode.OUT \n值为2"),
     _("mpython.PinMode.PWM \n值为3"),
     _("mpython.PinMode.ANALOG \n值为4"),
+    # mpython MPythonPin
     _("mpython.MPythonPin(pin, mode = PinMode.IN) \npin: 端口号\nmode: PinMode.IN / PinMode.OUT / PinMode.PWM / PinMode.ANALOG"),
     _("mpython.MPythonPin.read_digital()"),
     _("mpython.MPythonPin.write_digital()"),
     _("mpython.MPythonPin.read_analog()"),
-    _("mpython.MPythonPin.write_analog(duty, freq = 1000)"),
+    _("mpython.MPythonPin.write_analog(duty, freq=1000)"),
+    # mpython Servo
+    _("mpython.Servo.write_us(us) \nus: min=750, max=2250"),
+    _("mpython.Servo.write_angle(angle) \nangle: min=0, max=180"),
+    # mpython UI
+    _("mpython.UI.ProgressBar(x, y, width, height, progress)"),
+    _("mpython.UI.stripBar(x, y, width, height, progress, dir=1, frame=1)"),
+    # mpython DHTBase
+    _("mpython.DHTBase.measure()"),
+    # mpython DHT11
+    _("mpython.DHT11.humidity()"),
+    _("mpython.DHT11.temperature()"),
+    # mpython DHT22
+    _("mpython.DHT22.humidity()"),
+    _("mpython.DHT22.temperature()"),
     # mpython display
     _("mpython.oled.fill(c) \n用指定颜色填充屏幕，0为全黑"),
     _("mpython.oled.fill_rect(x, y, w, h, c)"),
     #_("oled.DispChar(str, x, y, mode = TextMode.normal) \nstr: 需要显示的字符\nx: 显示位置的x坐标\ny: 显示位置的y坐标\n(可选参数)mode : normal = 1(默认值) / rev = 2 / trans = 3 / xor = 4"),
     _("mpython.oled.DispChar(str, x, y) \nstr: 需要显示的字符\nx: 显示位置的x坐标\ny: 显示位置的y坐标"),
+    _("mpython.oled.circle(x0, y0, radius , c)"),
+    _("mpython.oled.fill_circle(x0, y0, radius , c)"),
+    _("mpython.oled.triangle(x0, y0, x1, y1, x2, y2, c)"),
+    _("mpython.oled.fill_triangle(x0, y0, x1, y1, x2, y2, c)"),
+    _("mpython.oled.Bitmap(x, y, bitmap, w, h, c)"),
+    _("mpython.oled.drawCircleHelper(x0, y0, r, cornername, c)"),
+    _("mpython.oled.RoundRect(x, y, w, h, r, c)"),
     _("mpython.oled.show() \n显示内容生效"),
     _("mpython.oled.pixel(x, y[, c]) \n如果参数c没有赋值，则返回点(x,y)的颜色\n如果参数c有值，则设置点(x,y)为指定颜色c"),
     _("mpython.oled.hline(x, y, w, c)"),

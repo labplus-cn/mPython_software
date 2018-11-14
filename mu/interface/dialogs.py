@@ -16,8 +16,13 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
+
+import sys
+import platform
+import os.path
+import configparser
 import logging
-from PyQt5.QtCore import QSize
+from PyQt5.QtCore import QSize, Qt
 from PyQt5.QtWidgets import (QVBoxLayout, QListWidget, QLabel, QListWidgetItem,
                              QDialog, QDialogButtonBox, QPlainTextEdit,
                              QTabWidget, QWidget, QCheckBox, QLineEdit)
@@ -262,3 +267,91 @@ class FindReplaceDialog(QDialog):
         Return the value of the global replace flag.
         """
         return self.replace_all_flag.isChecked()
+
+
+class UpdateFirmwareDialog(QDialog):
+    """
+    Defines a UI for update firmware.
+    """
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+    def setup(self, _info, _config_dir):
+        self.config_dir = _config_dir
+        self.setMinimumSize(400, 200)
+        self.setWindowTitle(_('mPython2'))
+        widget_layout = QVBoxLayout()
+        self.setLayout(widget_layout)
+        label = QLabel(_info)
+        label.setWordWrap(True)
+        widget_layout.addWidget(label)
+        cb = QCheckBox(_('Ignore this update'), self)
+        # cb.move(20, 20)
+        # cb.toggle()
+        cb.stateChanged.connect(self.change_ignore)
+        widget_layout.addWidget(cb)
+        button_box = QDialogButtonBox(QDialogButtonBox.Ok |
+                                      QDialogButtonBox.Cancel)
+        button_box.accepted.connect(self.accept)
+        button_box.rejected.connect(self.reject)
+        widget_layout.addWidget(button_box)
+
+    def set_ignore_firmware(self, _mark):
+        ini_path = os.path.join(self.config_dir, 'mpython.ini')
+        if os.path.isfile(ini_path):
+            cf = configparser.ConfigParser()
+            cf.read(ini_path)
+            if not cf.has_section("firmware"):
+                cf.add_section("firmware")
+            cf.set("firmware", "ignore", _mark)
+            cf.write(open(ini_path, "w"))
+
+    def change_ignore(self, _state):
+        if _state == Qt.Checked:
+            self.set_ignore_firmware("1")
+        else:
+            self.set_ignore_firmware("0")
+
+
+class PutPyFileDialog(QDialog):
+    """
+    Defines a Dialog after put py file to mPython board.
+    """
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+    def setup(self, _filename, _config_dir):
+        self.config_dir = _config_dir
+        self.setMinimumSize(360, 180)
+        self.setWindowTitle(_('mPython2'))
+        widget_layout = QVBoxLayout()
+        self.setLayout(widget_layout)
+        _info =_("The python file '{}' has been copied successfully, press 'OK' to run it?").format(_filename)
+        label = QLabel(_info)
+        label.setWordWrap(True)
+        widget_layout.addWidget(label)
+        cb = QCheckBox(_('Don\'t prompt me'), self)
+        cb.stateChanged.connect(self.change_param)
+        widget_layout.addWidget(cb)
+        button_box = QDialogButtonBox(QDialogButtonBox.Ok |
+                                      QDialogButtonBox.Cancel)
+        button_box.accepted.connect(self.accept)
+        button_box.rejected.connect(self.reject)
+        widget_layout.addWidget(button_box)
+
+    def set_downloadrun(self, _mark):
+        ini_path = os.path.join(self.config_dir, 'mpython.ini')
+        if os.path.isfile(ini_path):
+            cf = configparser.ConfigParser()
+            cf.read(ini_path)
+            if not cf.has_section("common"):
+                cf.add_section("common")
+            cf.set("common", "downloadrun", _mark)
+            cf.write(open(ini_path, "w"))
+
+    def change_param(self, _state):
+        if _state == Qt.Checked:
+            self.set_downloadrun("0")
+        else:
+            self.set_downloadrun("1")
+

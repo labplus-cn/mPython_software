@@ -26,6 +26,7 @@ import time
 import re
 import platform
 import subprocess
+import configparser
 from tokenize import TokenError
 from mu.logic import HOME_DIRECTORY
 from mu.contrib import uflash, espfs
@@ -33,6 +34,7 @@ from mu.modes.api import ESP_APIS, SHARED_APIS
 from mu.modes.base import MicroPythonMode
 from mu.interface.panes import CHARTS
 from PyQt5.QtCore import QObject, QThread, pyqtSignal, QTimer
+from PyQt5.QtWidgets import QMessageBox
 
 # We can run without nudatus
 can_minify = True
@@ -98,9 +100,14 @@ class DeviceRunner(QThread):
             self.running = True
             if self.filename is None:
                 result, err = espfs.run_content(self, content=self.content, serial=self.serial)
+                # print(result, err)
             else:
                 result, err = espfs.run_py(self, filename=self.filename, serial=self.serial)
-            if result is False:
+                # print(result, err)
+            if result == 1:
+                self.on_error.emit(str(err, "utf8"))
+                self.running = False
+            elif result == 2:
                 size = re.findall("\d+", str(err, "utf8"))[0]
                 self.on_error.emit(_("MemoryError: memory allocation failed,"
                                      " allocating {} bytes").format(size))
@@ -115,6 +122,7 @@ class DeviceRunner(QThread):
 class DeviceRestorer(QThread):
 
     on_info = pyqtSignal(str)
+    on_info10 = pyqtSignal(str)
     on_restore = pyqtSignal()
     on_start = pyqtSignal()
     on_finish = pyqtSignal()
@@ -123,21 +131,28 @@ class DeviceRestorer(QThread):
         QThread.__init__(self)
         self.running = False
 
-    def set(self, port):
-        self.port = port
+    def set(self, _port, _home):
+        self.port = _port
+        self.home = _home
 
     def run(self):
         try:
             self.running = True
+            lib_path = os.path.join(self.home, '__config__', 'target.bin')
             if platform.system() == "Darwin":
                 app_path = sys.executable if getattr(sys, 'frozen', False) else sys.argv[0]
                 app_dir = os.path.dirname(os.path.abspath(app_path))
-                lib_path = os.path.join(app_dir, "../Resources/")
-                cmd = '"{}python/bin/python3" "{}app_packages/esptool.py" -p {} -b 1152000 write_flash -ff=40m -fm=dio -fs=8MB 0x0000 "{}target.bin"'.format(lib_path, lib_path, self.port, lib_path)
+                app_dir = os.path.join(app_dir, "../Resources")
+                if not os.path.isfile(lib_path):
+                    lib_path = os.path.join(app_dir, 'target.bin')
+                cmd = '"{}/python/bin/python3" "{}/app_packages/esptool.py" -p {} -b 1152000 write_flash -ff=40m -fm=dio -fs=8MB 0x0000 "{}"'.format(app_dir, app_dir, self.port, lib_path)
             else:
                 app_dir = os.path.split( os.path.realpath( sys.argv[0] ) )[0]
                 # app_dir = "D:\\github\\mu-mpython\\build\\nsis"
-                cmd = '"{}\\Python\\python.exe" "{}\\pkgs\\esptool.py" -p {} -b 1152000 write_flash -ff=40m -fm=dio -fs=8MB 0x0000 "{}\\target.bin"'.format(app_dir, app_dir, self.port, app_dir)
+                if not os.path.isfile(lib_path):
+                    lib_path = os.path.join(app_dir, 'target.bin')
+                cmd = '"{}\\Python\\python.exe" "{}\\pkgs\\esptool.py" -p {} -b 1152000 write_flash -ff=40m -fm=dio -fs=8MB 0x0000 "{}"'.format(app_dir, app_dir, self.port, lib_path)
+                # print(cmd)
 
             # self.on_info.emit(app_dir)
             
@@ -145,15 +160,15 @@ class DeviceRestorer(QThread):
             while p.poll() is None:
                 line = p.stdout.readline()
                 if line.startswith(b'\'esptool\' '):
-                    self.on_info.emit(_('Please install Python 3.6 and esptool first, then run this command.'))
+                    self.on_info.emit('Please install Python 3.6 and esptool first, then run this command.')
                 elif line.startswith(b'Serial port COM'):
-                    self.on_info.emit(_('In the next 10 seconds, please press the Key A and Key B at once then loose both keys'))
+                    self.on_info10.emit('In the next 15 seconds, please press the Key A and Key B at once then loose both keys')
                 # elif line.startswith(b'A fatal error occurred: Failed to connect to Espressif device:'):
                 # elif line.startswith(b'A fatal error occurred: MD5 of file does not match data in flash!'):
                 elif line.startswith(b'A fatal error occurred: '):
-                    self.on_info.emit(_('Recovery failed'))
+                    self.on_info.emit('Recovery failed')
                 elif line.startswith(b'Compressed '):
-                    self.on_info.emit(_('Start to recovery the firmware, it took about 30 seconds to recovery...'))
+                    self.on_info.emit('Start to recovery the firmware, it took about 30 seconds to recovery...')
                     self.on_start.emit()
                 elif line.startswith(b'Hard resetting via RTS pin...'):
                     self.on_finish.emit()
@@ -243,6 +258,7 @@ class FileManager(QObject):
     on_rename = pyqtSignal(str, str)
     on_rename_fail = pyqtSignal(str)
     on_run_content = pyqtSignal(str)
+    on_info_start = pyqtSignal(str, int)
     
     def __init__(self):
         super(QObject, self).__init__()
@@ -252,6 +268,7 @@ class FileManager(QObject):
         self.stop_py.connect(self.device_runner.stop)
         self.device_runner.on_error.connect(self.on_error)
         self.device_restorer.on_info.connect(self.on_info)
+        self.device_restorer.on_info10.connect(self.on_info10)
         self.device_restorer.on_restore.connect(self.on_start)
         self.device_restorer.on_start.connect(self.on_restore_start)
         self.device_restorer.on_finish.connect(self.on_restore_finish)
@@ -266,9 +283,12 @@ class FileManager(QObject):
 
     def on_error(self, err):
         self.on_run_fail.emit(err)
+
+    def on_info(self, info):
+        self.on_info_start.emit(info, 2)
         
-    def on_info(self, err):
-        self.on_run_fail.emit(err)
+    def on_info10(self, info):
+        self.on_info_start.emit(info, 15)
 
     def on_restore_start(self):
         self.restorer_timer.start()
@@ -394,17 +414,20 @@ class FileManager(QObject):
             logger.error(ex)
             self.on_set_default_fail.emit("{}".format(ex))
 
-    def write_lib(self):
+    def write_lib(self, _home):
         try:
             self.stop_py.emit()
             time.sleep(0.5)
             self.on_write_lib_start.emit()
-            app_path = sys.executable if getattr(sys, 'frozen', False) else sys.argv[0]
-            app_dir = os.path.dirname(os.path.abspath(app_path))
-            if platform.system() == "Darwin":
-                libpath = os.path.join(app_dir, "../Resources/mpython.py")
-            else:
-                libpath = os.path.join(app_dir, "mpython.py")
+            libpath = os.path.join(_home, '__config__', 'mpython.py')
+            if not os.path.isfile(libpath):
+                app_path = sys.executable if getattr(sys, 'frozen', False) else sys.argv[0]
+                app_dir = os.path.dirname(os.path.abspath(app_path))
+                if platform.system() == "Darwin":
+                    libpath = os.path.join(app_dir, "../Resources/mpython.py")
+                else:
+                    libpath = os.path.join(app_dir, "mpython.py")
+            # print(libpath)
             espfs.write_lib(libpath)
             self.on_write_lib.emit()
         except Exception as ex:
@@ -422,13 +445,13 @@ class FileManager(QObject):
             logger.error(ex)
             self.on_rename_fail.emit("{}".format(ex))
 
-    def reset_firmware(self):
+    def reset_firmware(self, _home):
         try:
             self.stop_py.emit()
             time.sleep(0.5)
             port, serial_number = espfs.find_device()
             if port is not None:
-                self.device_restorer.set(port)
+                self.device_restorer.set(port, _home)
                 self.device_restorer.start()
                 # p = Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE)  
                 # p.wait()  
@@ -451,6 +474,10 @@ class EspMode(MicroPythonMode):
     flash_thread = None
     flash_timer = None
     file_extensions = ['txt','json','ini']#'hex'
+    
+    builtins = ['I2C', 'PWM', 'Pin', 'ADC', 'TouchPad', 'SSD1106_I2C',
+                'esp', 'ustruct', 'NeoPixel', 'dht_readinto', 'sleep_ms',
+                'sleep_us']
 
     valid_boards = [
         (0x10C4, 0xEA60),  # mPython USB VID, PID
@@ -905,17 +932,21 @@ class EspMode(MicroPythonMode):
         if self.fs is None:
             super().toggle_repl(event)
             if self.repl:
-                self.set_buttons(flash=False, run=False, files=False)
+                self.set_buttons(flash=False, run=False)
                 self.editor.show_status_message(_('If there is a running program, please press Ctrl+C to interrupt.'))
             elif not (self.repl or self.plotter):
-                self.set_buttons(flash=True, run=True, files=True)
+               self.set_buttons(flash=True, run=True)
         else:
+            self.file_manager.stop_py.emit()
+            self.remove_fs()
+            """
             message = _("REPL and file system cannot work at the same time.")
             information = _("The REPL and file system both use the same USB "
                             "serial connection. Only one can be active "
                             "at any time. Toggle the file system off and "
                             "try again.")
             self.view.show_message(message, information)
+            """
 
     def toggle_plotter(self, event):
         """
@@ -924,10 +955,13 @@ class EspMode(MicroPythonMode):
         if self.fs is None:
             super().toggle_plotter(event)
             if self.plotter:
-                self.set_buttons(flash=False, run=False, files=False)
+                self.set_buttons(flash=False, run=False)
             elif not (self.repl or self.plotter):
-                self.set_buttons(flash=True, run=True, files=True)
+                self.set_buttons(flash=True, run=True)
         else:
+            self.file_manager.stop_py.emit()
+            self.remove_fs()
+            """
             message = _("The plotter and file system cannot work at the same "
                         "time.")
             information = _("The plotter and file system both use the same "
@@ -935,6 +969,7 @@ class EspMode(MicroPythonMode):
                             "at any time. Toggle the file system off and "
                             "try again.")
             self.view.show_message(message, information)
+            """
 
     def toggle_files(self, event):
         """
@@ -942,25 +977,33 @@ class EspMode(MicroPythonMode):
         system navigator for the micro:bit on or off.
         """
         if (self.repl or self.plotter):
+            if self.repl:
+                super().toggle_repl(event)
+            if self.plotter:
+                super().toggle_plotter(event)
+            
+            """
             message = _("File system cannot work at the same time as the "
                         "REPL or plotter.")
             information = _("The file system and the REPL and plotter "
                             "use the same USB serial connection. Toggle the "
                             "REPL and plotter off and try again.")
             self.view.show_message(message, information)
+            """
         else:
             if self.fs is None:
                 self.add_fs()
                 if self.fs:
                     logger.info('Toggle filesystem on.')
-                    self.set_buttons(repl=False, plotter=False)
+                    # self.set_buttons(repl=False, plotter=False)
             else:
                 self.file_manager.stop_py.emit()
                 self.remove_fs()
                 logger.info('Toggle filesystem off.')
-                self.set_buttons(repl=True, plotter=True)
+                # self.set_buttons(repl=True, plotter=True)
+        self.set_buttons(flash=True, run=True)
 
-    def add_fs(self):
+    def add_fs(self, _reset=False):
         """
         Add the file system navigator to the UI.
         """
@@ -976,8 +1019,11 @@ class EspMode(MicroPythonMode):
         self.file_manager.moveToThread(self.file_manager_thread)
         self.file_manager_thread.started.\
             connect(self.file_manager.on_start)
+        if _reset:
+            self.file_manager_thread.started.\
+                connect(self.do_reset_firmware)
         self.fs = self.view.add_filesystem_esp(self.workspace_dir(),
-                                           self.file_manager)
+                                               self.file_manager)
         self.fs.set_message.connect(self.editor.show_status_message)
         self.fs.set_warning.connect(self.view.show_message)
         self.file_manager_thread.start()
@@ -1012,3 +1058,109 @@ class EspMode(MicroPythonMode):
             except Exception:
                 return None
         return text
+
+    def get_res_path(self):
+        if platform.system() == "Darwin":
+            app_path = sys.executable if getattr(sys, 'frozen', False) else sys.argv[0]
+            app_dir = os.path.dirname(os.path.abspath(app_path))
+            res_path = os.path.join(app_dir, "../Resources/")
+        else:
+            res_path = os.path.split(os.path.realpath(sys.argv[0]))[0] + '\\'
+        return res_path
+
+    def get_firmware_version(self, _response):
+        if b'icroPython ' in _response:
+            i = _response.find(b'icroPython ') + 11
+            _response = _response[i:]
+            j = _response.find(b';')
+            _response = _response[0:j]
+            k = _response.find(b' on ') + 4
+            _date = _response[k:]
+            return str(_response, encoding="utf8"), str(_date, encoding="utf8")
+        else:
+            return None, None
+
+    def do_reset_firmware(self):
+        self.file_manager.reset_firmware(self.workspace_dir())
+    
+    def check_firmware(self):
+        # print("check_firmware")
+        if self.editor.mode != "mPython":
+            return
+        if not self.view.update_bin_status:
+            return
+        try:
+            serial = espfs.get_serial()
+            if serial:
+                serial.write(b'\x02')
+                for i in range(3):
+                    serial.write(b'\r\x03')
+                    time.sleep(0.01)
+                response = serial.read_until(b'Type "help()" for more information.')
+                # print(response)
+                firmware_ver, firmware_date = self.get_firmware_version(response)
+                if firmware_ver is None:
+                    serial.write(b'\r\x03')
+                    response = serial.read_until(b'Type "help()" for more information.')
+                    # print(response)
+                    firmware_ver, firmware_date = self.get_firmware_version(response)
+                if firmware_ver is None:
+                    firmware_ver = ""
+                    firmware_date = "None"
+                print(firmware_ver, firmware_date)
+                config_dir = os.path.join(self.workspace_dir(), "__config__")
+                ini_path = os.path.join(config_dir, "mpython.ini")
+                if not os.path.isfile(ini_path):
+                    return
+                cf = configparser.ConfigParser()
+                cf.read(ini_path)
+                if cf.has_section("firmware"):
+                    local_ver = None
+                    local_date = None
+                    local_ignore = None
+                    try:
+                        local_ver = cf.get("firmware","version")
+                        local_date = cf.get("firmware","date")
+                        local_ignore = cf.get("firmware","ignore")
+                    except Exception as ex:
+                        print(ex)
+                    print(local_ver, local_date, local_ignore)
+                    if local_ignore is not None:
+                        if local_ignore == "1":
+                            return
+                    if local_ver is not None:
+                        if firmware_ver == local_ver:
+                            return
+                        if firmware_ver == "":
+                            info = _("No onboard firmware detected, replace th"
+                                "e firmware in hardware by the firmware in sof"
+                                "tware (release date: {}).\n\nWarning: this op"
+                                "eration will cause all user files lost.").format(local_date)
+                            if self.view.show_update_firmware(info, config_dir):
+                                if self.fs is None:
+                                    self.add_fs(_reset=True)
+                                else:
+                                    self.file_manager.reset_firmware(self.workspace_dir())
+                        else:
+                            info = _("The firmware (release date: {}) "
+                                "which preloaded in hardware is different "
+                                "from the firmware (release date: {}) "
+                                "which preseted in software. The question "
+                                "is whether to replace the firmware in "
+                                "hardware by the firmware in software.\n\n"
+                                "Warning: this operation will cause all "
+                                "user files lost.").format(firmware_date,
+                                local_date)
+                            if self.view.show_update_firmware(info, config_dir):
+                                result = self.view.show_confirmation(_("WARNING: This operation "
+                                    "will cause all user files lost.!!!\nWARNING: This operation "
+                                    "will cause all user files lost !!!\nWARNING: This operation "
+                                    "will cause all user files lost !!!"), icon='Warning')
+                                if result == QMessageBox.Ok:
+                                    if self.fs is None:
+                                        self.add_fs(_reset=True)
+                                    else:
+                                        self.file_manager.reset_firmware(self.workspace_dir())
+        except Exception as ex:
+            return        
+

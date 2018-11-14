@@ -17,11 +17,13 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 import sys
+import platform
 import logging
 import serial
 import os.path
 import send2trash
 import webbrowser
+import configparser
 from PyQt5.QtCore import QSize, Qt, pyqtSignal, QTimer, QIODevice
 from PyQt5.QtWidgets import (QToolBar, QAction, QDesktopWidget, QWidget,
                              QVBoxLayout, QTabWidget, QFileDialog, QMessageBox,
@@ -30,7 +32,7 @@ from PyQt5.QtWidgets import (QToolBar, QAction, QDesktopWidget, QWidget,
 from PyQt5.QtGui import QKeySequence, QStandardItemModel
 from PyQt5.QtSerialPort import QSerialPort
 from mu import __version__
-from mu.interface.dialogs import ModeSelector, AdminDialog, FindReplaceDialog
+from mu.interface.dialogs import ModeSelector, AdminDialog, FindReplaceDialog, UpdateFirmwareDialog
 from mu.interface.themes import (DayTheme, NightTheme, ContrastTheme,
                                  DEFAULT_FONT_SIZE)
 from mu.interface.panes import (DebugInspector, DebugInspectorItem,
@@ -196,6 +198,7 @@ class Window(QMainWindow):
     open_file = pyqtSignal(str)
     load_theme = pyqtSignal(str)
     previous_folder = None
+    update_bin_status = False
 
     def zoom_in(self):
         """
@@ -470,6 +473,7 @@ class Window(QMainWindow):
         file_manager.on_rename_start.connect(self.fs_pane.on_rename_start)
         file_manager.on_rename.connect(self.fs_pane.esp_fs.on_rename)
         file_manager.on_rename_fail.connect(self.fs_pane.on_rename_fail)
+        file_manager.on_info_start.connect(self.fs_pane.on_info_start)
         self.connect_zoom(self.fs_pane)
         return self.fs_pane
 
@@ -1040,6 +1044,54 @@ class Window(QMainWindow):
             " software, download it now ?").format(_version), icon='Question')
         if result == QMessageBox.Ok:
             webbrowser.open_new(_url)
+
+    def update_pylib(self, _bytes, _config_dir):
+        """
+        result = self.show_confirmation(_("\nFound a new version of "
+            "'mpython.py' library, update now ?"), icon='Question')
+        if result == QMessageBox.Ok:
+        """
+        file_path = os.path.join(_config_dir, 'mpython.py')
+        file_handle = open(file_path, mode='wb+')
+        file_handle.write(_bytes)
+        file_handle.close()
+        self.status_bar.set_message(_("The 'mpython.py' library which pre"
+            "seted in software has been updated to the latest version."))
+
+    def update_bin(self, _version, _bytes, _config_dir):
+        """
+        result = self.show_confirmation(_("\nFound a new firmware of "
+            "mPython board, update now ?"), icon='Question')
+        if result == QMessageBox.Ok:
+        """
+        file_path = os.path.join(_config_dir, 'target.bin')
+        file_handle = open(file_path, mode='wb')
+        file_handle.write(_bytes)
+        file_handle.close()
+        ini_path = os.path.join(_config_dir, 'mpython.ini')
+        cf = configparser.ConfigParser()
+        cf.read(ini_path)
+        if not cf.has_section("firmware"):
+            cf.add_section("firmware")
+        cf.set("firmware", "version", _version)
+        k = _version.find(' on ') + 4
+        _date = _version[k:]
+        cf.set("firmware", "date", _date)
+        cf.set("firmware", "ignore", "0")
+        # print(cf.get("firmware","version"))
+        cf.write(open(ini_path, "w"))
+        self.update_bin_status = True
+        self.status_bar.set_message(_("The firmware of mPython board which "
+            "preseted in software has been updated to the latest version."))
+
+    def set_update_bin_status(self, _status):
+        self.update_bin_status = _status
+
+    def show_update_firmware(self, _info, _config_dir):
+        dialog = UpdateFirmwareDialog(self)
+        dialog.setup(_info, _config_dir)
+        return dialog.exec()
+
 
 class StatusBar(QStatusBar):
     """

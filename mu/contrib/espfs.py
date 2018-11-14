@@ -186,6 +186,7 @@ def execute(commands, serial=None, read_file=False):
             time.sleep(0.1)
             t = serial.inWaiting()
         result = result.replace(b'\x04\x04>OK\x04\x04>', b'')
+        result = result.replace(b'OK\x04\x04>', b'')
         result = result.replace(b'\x04\x04>', b'')
     time.sleep(0.01)
     raw_off(serial)
@@ -378,9 +379,17 @@ def run_py(parent, filename, serial=None):
                 err = err.replace(b'\r\n', b'')
                 err = err.replace(b'>', b'')
                 err = b'MemoryError:' + err
-                return False, err
+                return 2, err
         except:
-            return False, b'MemoryError:'
+            return 2, b'MemoryError:'
+    if response.find(b'Traceback ') > 0:
+        try:
+            out, err = response.split(b'Traceback ', 1)  # Split stdout, stderr
+            if err:
+                err = b'Traceback ' + err
+                return 1, err
+        except:
+            return 1, response
     #print("thread running")
     while True:
         if parent.running:
@@ -390,7 +399,7 @@ def run_py(parent, filename, serial=None):
     #print("thread end")
     serial.write(b'\x02\x03')
     time.sleep(0.1)
-    return True, None
+    return 0, None
 
 
 def run_content(parent, content, serial=None):
@@ -425,9 +434,17 @@ def run_content(parent, content, serial=None):
                 err = err.replace(b'\r\n', b'')
                 err = err.replace(b'>', b'')
                 err = b'MemoryError:' + err
-                return False, err
+                return 2, err
         except:
-            return False, b'MemoryError:'
+            return 2, b'MemoryError:'
+    if response.find(b'Traceback ') > 0:
+        try:
+            out, err = response.split(b'Traceback ', 1)  # Split stdout, stderr
+            if err:
+                err = b'Traceback ' + err
+                return 1, err
+        except:
+            return 1, response
     #print("thread running")
     while True:
         if parent.running:
@@ -437,7 +454,7 @@ def run_content(parent, content, serial=None):
     #print("thread end")
     serial.write(b'\x02\x03')
     time.sleep(0.1)
-    return True, None
+    return 0, None
 
 
 def set_default(filename, serial=None):
@@ -531,7 +548,7 @@ def get(filename, serial=None):
     out = out.replace(b'\r\r\n', b'\r\n')
     out = out.replace(b'\r\r\n', b'\r\n')
     out = out.replace(b'\r\r\n', b'\r\n')
-    #print(out)
+    # print(out)
     return out
 
 

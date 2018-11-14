@@ -67,10 +67,12 @@ EXPANDED_IMPORT = ("from microbit import pin15, pin2, pin0, pin1, "
 EXPANDED_IMPORT_MACHINE = ("from machine import PWM, TouchPad, Timer, Pin, "
                            "Signal, ADC, ADCChannel, UART, SPI, I2C, RTC, "
                            "Timer, WDT, SD")
-EXPANDED_IMPORT_MPYTHON = ("from mpython import buzz, oled, accelerometer, "
+EXPANDED_IMPORT_MPYTHON = ("from mpython import Font, Accelerometer, TextMode,"
+                           " OLED, Buzz, PinMode, MPythonPin, Servo, UI, "
+                           "DHTBase, DHT11, DHT22, buzz, oled, accelerometer, "
                            "rgb, light, sound, button_a, button_b, display, "
                            "touchPad_P, touchPad_Y, touchPad_T, "
-                           "touchPad_H, touchPad_O, touchPad_N")
+                           "touchPad_H, touchPad_O, touchPad_N, i2c")
 # Port number for debugger.
 DEBUGGER_PORT = 31415
 MOTD = [  # Candidate phrases for the message of the day (MOTD).
@@ -575,6 +577,7 @@ class Editor:
         self.replace = ''
         self.global_replace = False
         self.selecting_mode = False  # Flag to stop auto-detection of modes.
+        self.update_bin_status = False
         if not os.path.exists(DATA_DIR):
             logger.debug('Creating directory: {}'.format(DATA_DIR))
             os.makedirs(DATA_DIR)
@@ -1227,6 +1230,11 @@ class Editor:
                 mode_name = device[0]
                 device_name = self.modes[mode_name].name
                 msg = _('Detected new {} device.').format(device_name)
+                if mode_name == "mPython":
+                    # print(self._view.update_bin_status)
+                    # print(self.modes["mPython"].workspace_dir())
+                    if self._view.update_bin_status:
+                        self.modes["mPython"].check_firmware()
                 self.show_status_message(msg)
                 # Only ask to switch mode if a single device type is connected
                 # and we're not already trying to select a new mode via the

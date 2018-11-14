@@ -26,6 +26,7 @@ import string
 import bisect
 import os.path
 import json
+import configparser
 from PyQt5.QtCore import (Qt, QProcess, QProcessEnvironment, pyqtSignal,
                           QTimer, QUrl)
 from collections import deque
@@ -37,6 +38,7 @@ from PyQt5.QtGui import (QKeySequence, QTextCursor, QCursor, QPainter,
 from qtconsole.rich_jupyter_widget import RichJupyterWidget
 from mu.interface.themes import Font
 from mu.interface.themes import DEFAULT_FONT_SIZE
+from mu.interface.dialogs import PutPyFileDialog
 
 
 logger = logging.getLogger(__name__)
@@ -138,7 +140,7 @@ class MicroPythonREPLPane(QTextEdit):
         if self.serial:
             self.serial.setDataTerminalReady(False)
             # self.serial.setRequestToSend(False)
-            self.serial.write(b'\x04')
+            # self.serial.write(b'\x04')
 
     def paste(self):
         """
@@ -240,7 +242,10 @@ class MicroPythonREPLPane(QTextEdit):
                 # VT100 cursor detected: <Esc>[
                 i += 2  # move index to after the [
                 regex = r'(?P<count>[\d]*)(;?[\d]*)*(?P<action>[ABCDKm])'
-                m = re.search(regex, data[i:].decode('utf-8'))
+                try:
+                    m = re.search(regex, data[i:].decode('utf-8'))
+                except Exception as ex:
+                    break
                 if m:
                     # move to (almost) after control seq
                     # (will ++ at end of loop)
@@ -379,10 +384,10 @@ class EspFileList(MuFileList):
     run_content = pyqtSignal(str)
     load_py = pyqtSignal(str,str)
     stop_run_py = pyqtSignal()
-    write_lib = pyqtSignal()
+    write_lib = pyqtSignal(str)
     set_default = pyqtSignal(str)
     rename = pyqtSignal(str,str)
-    reset_firmware = pyqtSignal()
+    reset_firmware = pyqtSignal(str)
 
     def __init__(self, home):
         super().__init__()
@@ -411,6 +416,23 @@ class EspFileList(MuFileList):
         msg = _("'{}' successfully copied to mPython board, please wait for the list to refresh.").format(esp_file)
         self.set_message.emit(msg)
         self.list_files.emit()
+        if esp_file.lower().endswith('.py'):
+            config_dir = os.path.join(self.home, '__config__')
+            ini_path = os.path.join(config_dir, 'mpython.ini')
+            download_run = "1"
+            if os.path.isfile(ini_path):
+                cf = configparser.ConfigParser()
+                cf.read(ini_path)
+                if cf.has_section("common"):
+                    try:
+                        download_run = cf.get("common","downloadrun")
+                    except Exception as ex:
+                        print(ex)
+            if download_run == "1":
+                dialog = PutPyFileDialog(self)
+                dialog.setup(esp_file, config_dir)
+                if dialog.exec_():
+                    self.run_py.emit(esp_file)
 
     def on_run_content(self, content):
         """
@@ -421,7 +443,24 @@ class EspFileList(MuFileList):
         self.run_content.emit(content)
 
     def contextMenuEvent(self, event):
-        menu = QMenu(self)
+        menu = QMenu(self)        
+        if self.currentItem() == None:
+            write_lib_action = menu.addAction(_("Flash basic library (mpython.py)"))
+            restore_action = menu.addAction(_("Recovery firmware (cannot be undone)"))
+            action = menu.exec_(self.mapToGlobal(event.pos()))
+            if action == write_lib_action:
+                self.write_lib.emit(self.home)
+            elif action == restore_action:
+                mess = QMessageBox(self)
+                mess.setIcon(QMessageBox.Information)
+                mess.setText(_("Restoring to the original firmware will lose all "
+                               "personal files. This operation is irreversible. "
+                               "Press 'OK' to continue?"))
+                mess.setWindowTitle(_("mPython2"))
+                mess.setStandardButtons(QMessageBox.Ok | QMessageBox.Cancel)
+                if mess.exec_() == QMessageBox.Ok:
+                    self.reset_firmware.emit(self.home) 
+            return
         load_action = menu.addAction(_("Open in Mu"))
         run_action = menu.addAction(_("Run selected file"))
         stop_action = menu.addAction(_("Stop running"))
@@ -462,7 +501,7 @@ class EspFileList(MuFileList):
         elif action == stop_action:
             self.stop_run_py.emit()
         elif action == write_lib_action:
-            self.write_lib.emit()
+            self.write_lib.emit(self.home)
         elif action == setdft_action:
             if self.currentItem() is not None:
                 esp_filename = self.currentItem().text()
@@ -499,7 +538,7 @@ class EspFileList(MuFileList):
             mess.setWindowTitle(_("mPython2"))
             mess.setStandardButtons(QMessageBox.Ok | QMessageBox.Cancel)
             if mess.exec_() == QMessageBox.Ok:
-                self.reset_firmware.emit()           
+                self.reset_firmware.emit(self.home)           
         if no_file_found is True:
             msg = _('No file selected.')
             self.set_message.emit(msg)
@@ -611,7 +650,13 @@ class LocalFileList(MuFileList):
     def contextMenuEvent(self, event):
         menu = QMenu(self)
         if self.currentItem() == None:
-            return;
+            refresh_action = menu.addAction(_("Refresh"))
+            action = menu.exec_(self.mapToGlobal(event.pos()))
+            if action == refresh_action:
+                msg = _("Refresh local file list ...")
+                self.set_message.emit(msg)
+                self.list_files.emit()
+            return
         local_filename = self.currentItem().text()
         # Get the file extension
         ext = os.path.splitext(local_filename)[1].lower()
@@ -816,7 +861,7 @@ class EspFileSystemPane(QFrame):
     can be selected for deletion.
     """
 
-    set_message = pyqtSignal(str)
+    set_message = pyqtSignal(str, int)
     set_warning = pyqtSignal(str)
     list_files = pyqtSignal()
     open_file = pyqtSignal(str)
@@ -871,11 +916,11 @@ class EspFileSystemPane(QFrame):
         self.esp_fs.setAcceptDrops(True)
         self.local_fs.setAcceptDrops(True)
 
-    def show_message(self, message):
+    def show_message(self, message, sec=2):
         """
         Emits the set_message signal.
         """
-        self.set_message.emit(message)
+        self.set_message.emit(message, sec)
 
     def show_warning(self, message):
         """
@@ -945,7 +990,14 @@ class EspFileSystemPane(QFrame):
         """
         Fired when the referenced file cannot be run on the micro:bit.
         """
-        self.show_message(_(error_txt))
+        # self.show_message(_(error_txt))
+        self.show_warning(_(error_txt))
+
+    def on_info_start(self, info, sec):
+        """
+        Fired when the referenced file cannot be run on the micro:bit.
+        """
+        self.show_message(_(info), sec)
                             
     def on_set_default_fail(self, error_txt):
         self.show_message(_(error_txt))

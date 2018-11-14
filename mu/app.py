@@ -27,6 +27,8 @@ import pkgutil
 import sys
 import urllib.request
 import json
+import hashlib
+import time
 
 from PyQt5.QtCore import QTimer, Qt, QThread, pyqtSignal
 from PyQt5.QtWidgets import QApplication, QSplashScreen
@@ -44,16 +46,21 @@ from mu.interface.themes import NIGHT_STYLE, DAY_STYLE, CONTRAST_STYLE
 class Updater(QThread):
 
     download_url = pyqtSignal(str, str)
+    update_pylib = pyqtSignal(bytes, str)
+    set_update_bin_status = pyqtSignal(bool)
+    update_bin = pyqtSignal(str, bytes, str)
+    check_firmware = pyqtSignal()
         
-    def __init__(self, _key, _url):
+    def __init__(self, _key, _url, _config_dir):
         QThread.__init__(self)
         self.key = _key
         self.url = _url
+        self.config_dir = _config_dir
 
     def download(self, user_agent='wswp', num_retries=2):
         #print('Downloading:', self.url)
         headers = {'User-agent':user_agent}
-        request = urllib.request.Request(self.url, headers = headers)
+        request = urllib.request.Request(self.url, headers=headers)
 
         try:
             html = urllib.request.urlopen(self.url).read()
@@ -69,11 +76,57 @@ class Updater(QThread):
     def run(self):
         html = self.download()
         if html is not None:
-            hjson = json.loads(html)
+            try:
+                hjson = json.loads(html)
+            except Exception as ex:
+                logging.error(ex)
+                return
             ideList = hjson['IDE']
             if __version__ < ideList[0]['version']:
-                self.download_url.emit(ideList[0]['version'],
-                                       ideList[0][self.key]['url'])
+                self.download_url.emit(ideList[0]['version'], ideList[0][self.key]['url'])
+            else:
+                time.sleep(5)
+                mp_info = hjson['mpython.py']
+                mp_update_md5 = mp_info['MD5']
+                # print(mp_update_md5)
+                mp_path = os.path.join(self.config_dir, 'mpython.py')
+                if os.path.isfile(mp_path):
+                    mp_file = open(mp_path, 'rb')
+                    mp_local_md5 = hashlib.md5(mp_file.read()).hexdigest()
+                else:
+                    mp_local_md5 = ""
+                # print(mp_local_md5)
+                if mp_local_md5 != mp_update_md5:
+                    mp_update_url = mp_info['url']
+                    try:
+                        mp_update_bytes = urllib.request.urlopen(mp_update_url).read()
+                        self.update_pylib.emit(mp_update_bytes, self.config_dir)
+                    except urllib.request.URLError as e:
+                        print(e)
+                    time.sleep(5)
+                    
+                hw_info = hjson['firmware']
+                hw_update_md5 = hw_info['MD5']
+                # print(hw_update_md5)
+                hw_path = os.path.join(self.config_dir, 'target.bin')
+                if os.path.isfile(hw_path):
+                    hw_file = open(hw_path, 'rb')
+                    hw_local_md5 = hashlib.md5(hw_file.read()).hexdigest()
+                else:
+                    hw_local_md5 = ""
+                # print(hw_local_md5)
+                if hw_local_md5 == hw_update_md5:
+                    self.set_update_bin_status.emit(True)
+                else:
+                    self.set_update_bin_status.emit(False)
+                    hw_update_url = hw_info['url']
+                    hw_update_version = hw_info['version']
+                    try:
+                        hw_update_bytes = urllib.request.urlopen(hw_update_url).read()
+                        self.update_bin.emit(hw_update_version, hw_update_bytes, self.config_dir)
+                    except urllib.request.URLError as e:
+                        print(e)
+        self.check_firmware.emit()
 
 
 def setup_logging():
@@ -219,8 +272,15 @@ def run():
     # Check software update.
     key = get_platform()
     url = "http://static.steamaker.cn/files/mPython2.json"
-    updater = Updater(key, url)
+    config_dir = os.path.join(editor.modes['mPython'].workspace_dir(), '__config__')
+    if not os.path.exists(config_dir):
+        os.makedirs(config_dir)
+    updater = Updater(key, url, config_dir)
     updater.download_url.connect(editor_window.download_url)
+    updater.update_pylib.connect(editor_window.update_pylib)
+    updater.update_bin.connect(editor_window.update_bin)
+    updater.set_update_bin_status.connect(editor_window.set_update_bin_status)
+    updater.check_firmware.connect(editor.modes['mPython'].check_firmware)
     updater.start()
             
     # Stop the program after the application finishes executing.
