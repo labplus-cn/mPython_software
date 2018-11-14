@@ -12,16 +12,22 @@ GitHub: https://github.com/labplus-cn/mPython    <br/>
 mPython掌控板在线文档: https://mPython.readthedocs.io
 
 ## 更新日志
-0.2.3 修改“运行”按钮为实时运行
+### 0.2.3
+* 修改“运行”按钮为实时运行
+### 0.2.4
+* 增加恢复固件功能
+* 修复部分电脑不能右键运行和实时运行的bug
+* 交互时允许粘贴中文
+* 右键允许运行中文文件名
 
 ## 软件下载地址
 目前有三个下载地址（for Windows 64位、Windows 32位、MacOS）：
 
-http://static.steamaker.cn/files/mPython2_0.2.3_win64.exe
+http://static.steamaker.cn/files/mPython2_0.2.4_win64.exe
 
-http://static.steamaker.cn/files/mPython2_0.2.3_win32.exe
+http://static.steamaker.cn/files/mPython2_0.2.4_win32.exe
 
-http://static.steamaker.cn/files/mPython2_0.2.3_macos.zip
+http://static.steamaker.cn/files/mPython2_0.2.4_macos.zip
 
 ## 软件使用教程
 软件使用教程请参考[mpython文档](https://mpython.readthedocs.io/zh/latest/board/software.html)
