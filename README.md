@@ -19,15 +19,20 @@ mPython掌控板在线文档: https://mPython.readthedocs.io
 * 修复部分电脑不能右键运行和实时运行的bug
 * 交互时允许粘贴中文
 * 右键允许运行中文文件名
+### 0.2.5
+* 代码运行出错时，弹出调试信息
+* 联网自动更新：mpython.py库、和软件内置固件
+* 接入掌控板时，如板载固件不一致，提示是否需要更新固件
+* 刷入python文件后，提示运行
 
 ## 软件下载地址
 目前有三个下载地址（for Windows 64位、Windows 32位、MacOS）：
 
-http://static.steamaker.cn/files/mPython2_0.2.4_win64.exe
+http://static.steamaker.cn/files/mPython2_0.2.5_win64.exe
 
-http://static.steamaker.cn/files/mPython2_0.2.4_win32.exe
+http://static.steamaker.cn/files/mPython2_0.2.5_win32.exe
 
-http://static.steamaker.cn/files/mPython2_0.2.4_macos.zip
+http://static.steamaker.cn/files/mPython2_0.2.5_macos.zip
 
 ## 软件使用教程
 软件使用教程请参考[mpython文档](https://mpython.readthedocs.io/zh/latest/board/software.html)
